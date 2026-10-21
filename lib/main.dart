@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/kanban_board_provider.dart';
-import 'views/kanban_board_view.dart';
+import 'views/splash_screen_view.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -66,7 +66,7 @@ class TunTaskApp extends StatelessWidget {
             ),
           ),
         ),
-        home: const KanbanBoardView(),
+        home: const SplashScreenView(),
       ),
     );
   }
