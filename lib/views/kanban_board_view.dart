@@ -5,6 +5,7 @@ import '../widgets/board_column_widget.dart';
 import '../widgets/column_dialog.dart';
 import '../widgets/create_task_dialog.dart';
 import '../widgets/search_filter_bar.dart';
+import 'settings_screen.dart';
 
 class KanbanBoardView extends StatelessWidget {
   const KanbanBoardView({super.key});
@@ -36,6 +37,7 @@ class KanbanBoardView extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.colorScheme.primary;
     final provider = context.watch<KanbanBoardProvider>();
     final columns = provider.columns;
 
@@ -50,7 +52,7 @@ class KanbanBoardView extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
-                color: const Color(0xFF0052CC),
+                color: primaryColor,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Icon(
@@ -123,7 +125,7 @@ class KanbanBoardView extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0052CC),
+                backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -140,7 +142,16 @@ class KanbanBoardView extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(width: 12),
+          const SizedBox(width: 4),
+
+          // Settings Button
+          IconButton(
+            tooltip: 'Pengaturan & Tema',
+            icon: const Icon(Icons.palette_outlined, size: 22),
+            onPressed: () => SettingsScreen.showModal(context),
+          ),
+
+          const SizedBox(width: 8),
         ],
       ),
       body: Column(
@@ -210,6 +221,7 @@ class KanbanBoardView extends StatelessWidget {
     KanbanBoardProvider provider,
     bool isDark,
   ) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
     return Container(
       width: 280,
       margin: const EdgeInsets.only(right: 16, bottom: 20),
@@ -238,7 +250,7 @@ class KanbanBoardView extends StatelessWidget {
                 Icon(
                   Icons.add_circle_outline_rounded,
                   size: 20,
-                  color: isDark ? Colors.blue[300] : const Color(0xFF0052CC),
+                  color: isDark ? primaryColor : primaryColor,
                 ),
                 const SizedBox(width: 8),
                 Flexible(
@@ -248,7 +260,7 @@ class KanbanBoardView extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.blue[300] : const Color(0xFF0052CC),
+                      color: primaryColor,
                     ),
                   ),
                 ),

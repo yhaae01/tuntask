@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tuntask/main.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   testWidgets('TunTask Board smoke test', (WidgetTester tester) async {
     // Set a wide screen size typical for desktop / web kanban board
     tester.view.physicalSize = const Size(1920, 1080);
@@ -20,5 +25,8 @@ void main() {
     expect(find.text('IN PROGRESS'), findsOneWidget);
     expect(find.text('IN REVIEW'), findsOneWidget);
     expect(find.text('DONE'), findsOneWidget);
+
+    // Verify Settings button is present in AppBar
+    expect(find.byIcon(Icons.palette_outlined), findsOneWidget);
   });
 }
