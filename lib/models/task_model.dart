@@ -50,7 +50,9 @@ class TaskModel {
     TaskPriority? priority,
     List<String>? labels,
     String? assignee,
+    bool clearAssignee = false,
     DateTime? dueDate,
+    bool clearDueDate = false,
     DateTime? createdAt,
     List<SubTaskModel>? subtasks,
   }) {
@@ -61,8 +63,8 @@ class TaskModel {
       columnId: columnId ?? this.columnId,
       priority: priority ?? this.priority,
       labels: labels ?? this.labels,
-      assignee: assignee ?? this.assignee,
-      dueDate: dueDate ?? this.dueDate,
+      assignee: clearAssignee ? null : (assignee ?? this.assignee),
+      dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
       createdAt: createdAt ?? this.createdAt,
       subtasks: subtasks ?? this.subtasks,
     );
@@ -102,7 +104,7 @@ class TaskModel {
           ? DateTime.tryParse(map['createdAt'].toString()) ?? DateTime.now()
           : DateTime.now(),
       subtasks: (map['subtasks'] as List<dynamic>?)
-              ?.map((x) => SubTaskModel.fromMap(x as Map<String, dynamic>))
+              ?.map((x) => SubTaskModel.fromMap(Map<String, dynamic>.from(x as Map)))
               .toList() ??
           const [],
     );

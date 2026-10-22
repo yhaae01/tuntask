@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/kanban_board_provider.dart';
 import '../providers/theme_provider.dart';
 import '../theme/app_theme.dart';
 
@@ -41,6 +42,8 @@ class SettingsScreen extends StatelessWidget {
               _buildLivePreviewCard(context, isDark),
               const SizedBox(height: 28),
               _buildResetButton(context),
+              const SizedBox(height: 12),
+              _buildResetBoardDataButton(context),
               const SizedBox(height: 40),
             ],
           ),
@@ -350,6 +353,57 @@ class SettingsScreen extends StatelessWidget {
       ),
     );
   }
+
+  static Widget _buildResetBoardDataButton(BuildContext context) {
+    final kanbanProvider = context.read<KanbanBoardProvider>();
+
+    return Center(
+      child: TextButton.icon(
+        style: TextButton.styleFrom(
+          foregroundColor: Colors.grey[600],
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        ),
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Reset Data Board?'),
+              content: const Text(
+                'Tindakan ini akan mengembalikan semua kolom dan task ke data sampel awal (dummy). Semua task baru yang Anda buat akan terhapus.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('Batal'),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFFE53935)),
+                  onPressed: () async {
+                    Navigator.of(ctx).pop();
+                    await kanbanProvider.resetToMockData();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Board berhasil dikembalikan ke data sampel awal'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Reset Data'),
+                ),
+              ],
+            ),
+          );
+        },
+        icon: const Icon(Icons.restore_page_outlined, size: 18),
+        label: const Text(
+          'Kembalikan Board ke Data Sampel Awal',
+          style: TextStyle(fontSize: 13),
+        ),
+      ),
+    );
+  }
 }
 
 class SettingsModalSheet extends StatelessWidget {
@@ -423,6 +477,8 @@ class SettingsModalSheet extends StatelessWidget {
                     SettingsScreen._buildLivePreviewCard(context, isDark),
                     const SizedBox(height: 24),
                     SettingsScreen._buildResetButton(context),
+                    const SizedBox(height: 12),
+                    SettingsScreen._buildResetBoardDataButton(context),
                     const SizedBox(height: 30),
                   ],
                 ),

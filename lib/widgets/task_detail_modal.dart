@@ -63,19 +63,23 @@ class _TaskDetailModalState extends State<TaskDetailModal> {
 
   void _saveTaskChanges(KanbanBoardProvider provider, TaskModel currentTask) {
     final updated = currentTask.copyWith(
-      title: _titleController.text.trim(),
+      title: _titleController.text.trim().isEmpty
+          ? currentTask.title
+          : _titleController.text.trim(),
       description: _descController.text.trim(),
       columnId: _currentColumnId,
       priority: _currentPriority,
       assignee: _assigneeController.text.trim().isEmpty
           ? null
           : _assigneeController.text.trim(),
+      clearAssignee: _assigneeController.text.trim().isEmpty,
       dueDate: _currentDueDate,
     );
     provider.updateTask(updated);
     setState(() {
       _isEditingDetails = false;
     });
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Perubahan task berhasil disimpan'),
@@ -106,6 +110,7 @@ class _TaskDetailModalState extends State<TaskDetailModal> {
               provider.deleteTask(widget.initialTask.id);
               Navigator.of(ctx).pop(); // Close dialog
               Navigator.of(context).pop(); // Close modal
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Task berhasil dihapus'),
@@ -120,17 +125,54 @@ class _TaskDetailModalState extends State<TaskDetailModal> {
     );
   }
 
-  Future<void> _pickDueDate() async {
+  Future<void> _pickDueDate(
+    KanbanBoardProvider provider,
+    TaskModel currentTask,
+  ) async {
+    final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
-      initialDate: _currentDueDate ?? DateTime.now().add(const Duration(days: 2)),
-      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 3)),
+      initialDate:
+          currentTask.dueDate ?? now.add(const Duration(days: 2)),
+      firstDate: now.subtract(const Duration(days: 365)),
+      lastDate: now.add(const Duration(days: 365 * 3)),
+      helpText: 'PILIH TENGGAT WAKTU',
     );
     if (picked != null) {
       setState(() {
         _currentDueDate = picked;
       });
+      provider.updateTask(currentTask.copyWith(dueDate: picked));
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Tenggat waktu berhasil diubah ke ${DateFormat('d MMM yyyy').format(picked)}',
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  void _removeDueDate(
+    KanbanBoardProvider provider,
+    TaskModel currentTask,
+  ) {
+    setState(() {
+      _currentDueDate = null;
+    });
+    provider.updateTask(currentTask.copyWith(clearDueDate: true));
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tenggat waktu berhasil dihapus'),
+          duration: Duration(seconds: 2),
+        ),
+      );
     }
   }
 
@@ -148,7 +190,7 @@ class _TaskDetailModalState extends State<TaskDetailModal> {
 
     final columns = provider.columns;
     final activeColumn = columns.firstWhere(
-      (c) => c.id == _currentColumnId,
+      (c) => c.id == currentTask.columnId,
       orElse: () => columns.isNotEmpty
           ? columns.first
           : const BoardColumn(id: '', title: 'Unknown', colorHex: '#0052CC', order: 0),
@@ -309,7 +351,9 @@ class _TaskDetailModalState extends State<TaskDetailModal> {
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
-                              value: _currentColumnId,
+                              value: columns.any((c) => c.id == currentTask.columnId)
+                                  ? currentTask.columnId
+                                  : (columns.isNotEmpty ? columns.first.id : null),
                               isDense: true,
                               icon: const Icon(Icons.arrow_drop_down, size: 20),
                               items: columns.map((c) {
@@ -340,11 +384,24 @@ class _TaskDetailModalState extends State<TaskDetailModal> {
                                 );
                               }).toList(),
                               onChanged: (newCol) {
-                                if (newCol != null) {
+                                if (newCol != null && newCol != currentTask.columnId) {
                                   setState(() {
                                     _currentColumnId = newCol;
                                   });
                                   provider.moveTask(currentTask.id, newCol, 0);
+                                  final colTitle = columns.firstWhere(
+                                    (c) => c.id == newCol,
+                                    orElse: () => activeColumn,
+                                  ).title;
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Status berhasil dipindahkan ke "$colTitle"'),
+                                        duration: const Duration(seconds: 2),
+                                      ),
+                                    );
+                                  }
                                 }
                               },
                             ),
@@ -358,15 +415,15 @@ class _TaskDetailModalState extends State<TaskDetailModal> {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: _currentPriority.color.withValues(alpha: 0.12),
+                            color: currentTask.priority.color.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: _currentPriority.color.withValues(alpha: 0.3),
+                              color: currentTask.priority.color.withValues(alpha: 0.3),
                             ),
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<TaskPriority>(
-                              value: _currentPriority,
+                              value: currentTask.priority,
                               isDense: true,
                               icon: const Icon(Icons.arrow_drop_down, size: 20),
                               items: TaskPriority.values.map((p) {
@@ -390,65 +447,99 @@ class _TaskDetailModalState extends State<TaskDetailModal> {
                                 );
                               }).toList(),
                               onChanged: (newP) {
-                                if (newP != null) {
+                                if (newP != null && newP != currentTask.priority) {
                                   setState(() {
                                     _currentPriority = newP;
                                   });
                                   provider.updateTask(
                                     currentTask.copyWith(priority: newP),
                                   );
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Level prioritas diubah ke ${newP.displayName}'),
+                                        duration: const Duration(seconds: 2),
+                                      ),
+                                    );
+                                  }
                                 }
                               },
                             ),
                           ),
                         ),
 
-                        // Due date picker badge
-                        InkWell(
-                          onTap: _pickDueDate,
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 7,
+                        // Due date picker badge with instant update & clear button
+                        Container(
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? const Color(0xFF1E293B)
+                                : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: currentTask.isOverdue
+                                  ? const Color(0xFFE53935)
+                                  : (isDark ? Colors.white12 : Colors.black12),
                             ),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? const Color(0xFF1E293B)
-                                  : const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: currentTask.isOverdue
-                                    ? const Color(0xFFE53935)
-                                    : (isDark ? Colors.white12 : Colors.black12),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.calendar_month_outlined,
-                                  size: 16,
-                                  color: currentTask.isOverdue
-                                      ? const Color(0xFFE53935)
-                                      : const Color(0xFF0052CC),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  _currentDueDate != null
-                                      ? DateFormat('d MMM yyyy')
-                                          .format(_currentDueDate!)
-                                      : 'Set Due Date',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: currentTask.isOverdue
-                                        ? const Color(0xFFE53935)
-                                        : null,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              InkWell(
+                                onTap: () => _pickDueDate(provider, currentTask),
+                                borderRadius: BorderRadius.circular(8),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 7,
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.calendar_month_outlined,
+                                        size: 16,
+                                        color: currentTask.isOverdue
+                                            ? const Color(0xFFE53935)
+                                            : const Color(0xFF0052CC),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        currentTask.dueDate != null
+                                            ? DateFormat('d MMM yyyy')
+                                                .format(currentTask.dueDate!)
+                                            : 'Set Due Date',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: currentTask.isOverdue
+                                              ? const Color(0xFFE53935)
+                                              : null,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                              if (currentTask.dueDate != null)
+                                InkWell(
+                                  onTap: () => _removeDueDate(provider, currentTask),
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: const Padding(
+                                    padding: EdgeInsets.only(
+                                      right: 8,
+                                      left: 2,
+                                      top: 7,
+                                      bottom: 7,
+                                    ),
+                                    child: Icon(
+                                      Icons.close_rounded,
+                                      size: 14,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                       ],

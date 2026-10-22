@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../data/mock_data.dart';
 import '../models/board_column.dart';
@@ -7,6 +9,9 @@ import '../models/task_model.dart';
 import '../models/task_priority.dart';
 
 class KanbanBoardProvider extends ChangeNotifier {
+  static const String _prefTasksKey = 'tuntask_saved_tasks';
+  static const String _prefColumnsKey = 'tuntask_saved_columns';
+
   final _uuid = const Uuid();
 
   List<BoardColumn> _columns = [];
@@ -14,14 +19,83 @@ class KanbanBoardProvider extends ChangeNotifier {
 
   String _searchQuery = '';
   TaskPriority? _selectedPriority;
+  bool _isLoaded = false;
 
   KanbanBoardProvider() {
     _initializeData();
   }
 
-  void _initializeData() {
+  bool get isLoaded => _isLoaded;
+
+  Future<void> _initializeData() async {
     _columns = List.from(MockData.initialColumns);
     _tasks = List.from(MockData.initialTasks);
+    await _loadFromPreferences();
+  }
+
+  Future<void> _loadFromPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      final columnsJson = prefs.getString(_prefColumnsKey);
+      if (columnsJson != null) {
+        final List<dynamic> decodedCols = json.decode(columnsJson);
+        _columns = decodedCols
+            .map((item) => BoardColumn.fromMap(Map<String, dynamic>.from(item as Map)))
+            .toList();
+      }
+
+      final tasksJson = prefs.getString(_prefTasksKey);
+      if (tasksJson != null) {
+        final List<dynamic> decodedTasks = json.decode(tasksJson);
+        _tasks = decodedTasks
+            .map((item) => TaskModel.fromMap(Map<String, dynamic>.from(item as Map)))
+            .toList();
+      }
+
+      // If initial launch without existing saved data, persist initial mock data
+      if (columnsJson == null && tasksJson == null) {
+        await _saveAll();
+      }
+
+      _isLoaded = true;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading kanban board data: $e');
+      _isLoaded = true;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _saveTasks() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final tasksMapList = _tasks.map((t) => t.toMap()).toList();
+      await prefs.setString(_prefTasksKey, json.encode(tasksMapList));
+    } catch (e) {
+      debugPrint('Error saving tasks: $e');
+    }
+  }
+
+  Future<void> _saveColumns() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final columnsMapList = _columns.map((c) => c.toMap()).toList();
+      await prefs.setString(_prefColumnsKey, json.encode(columnsMapList));
+    } catch (e) {
+      debugPrint('Error saving columns: $e');
+    }
+  }
+
+  Future<void> _saveAll() async {
+    await Future.wait([_saveColumns(), _saveTasks()]);
+  }
+
+  Future<void> resetToMockData() async {
+    _columns = List.from(MockData.initialColumns);
+    _tasks = List.from(MockData.initialTasks);
+    notifyListeners();
+    await _saveAll();
   }
 
   // Getters
@@ -110,6 +184,7 @@ class KanbanBoardProvider extends ChangeNotifier {
   void addTask(TaskModel task) {
     _tasks.add(task);
     notifyListeners();
+    _saveTasks();
   }
 
   void updateTask(TaskModel updatedTask) {
@@ -117,12 +192,14 @@ class KanbanBoardProvider extends ChangeNotifier {
     if (index != -1) {
       _tasks[index] = updatedTask;
       notifyListeners();
+      _saveTasks();
     }
   }
 
   void deleteTask(String taskId) {
     _tasks.removeWhere((t) => t.id == taskId);
     notifyListeners();
+    _saveTasks();
   }
 
   void moveTask(String taskId, String targetColumnId, int newIndex) {
@@ -159,6 +236,7 @@ class KanbanBoardProvider extends ChangeNotifier {
     }
 
     notifyListeners();
+    _saveTasks();
   }
 
   void toggleSubtask(String taskId, String subtaskId) {
@@ -175,6 +253,7 @@ class KanbanBoardProvider extends ChangeNotifier {
 
     _tasks[taskIndex] = task.copyWith(subtasks: updatedSubtasks);
     notifyListeners();
+    _saveTasks();
   }
 
   void addSubtask(String taskId, String title) {
@@ -192,6 +271,7 @@ class KanbanBoardProvider extends ChangeNotifier {
       subtasks: [...task.subtasks, newSubtask],
     );
     notifyListeners();
+    _saveTasks();
   }
 
   void deleteSubtask(String taskId, String subtaskId) {
@@ -203,6 +283,7 @@ class KanbanBoardProvider extends ChangeNotifier {
       subtasks: task.subtasks.where((s) => s.id != subtaskId).toList(),
     );
     notifyListeners();
+    _saveTasks();
   }
 
   // Column Operations
@@ -218,6 +299,7 @@ class KanbanBoardProvider extends ChangeNotifier {
 
     _columns.add(newColumn);
     notifyListeners();
+    _saveColumns();
   }
 
   void updateColumn(String columnId, String newTitle, String colorHex) {
@@ -228,6 +310,7 @@ class KanbanBoardProvider extends ChangeNotifier {
         colorHex: colorHex.startsWith('#') ? colorHex : '#$colorHex',
       );
       notifyListeners();
+      _saveColumns();
     }
   }
 
@@ -257,6 +340,7 @@ class KanbanBoardProvider extends ChangeNotifier {
     }
 
     notifyListeners();
+    _saveAll();
   }
 
   void reorderColumn(int oldIndex, int newIndex) {
@@ -270,5 +354,6 @@ class KanbanBoardProvider extends ChangeNotifier {
       _columns[i] = _columns[i].copyWith(order: i);
     }
     notifyListeners();
+    _saveColumns();
   }
 }
